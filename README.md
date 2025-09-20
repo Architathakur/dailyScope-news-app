@@ -20,3 +20,6 @@ It features categories, trending headlines, and fun “Did You Know” facts.
 - HTML, CSS, JavaScript
 - GNews API for news
 - wttr.in API for weather
+
+## Live Preveiw
+https://architathakur.github.io/dailyScope-news-app/
