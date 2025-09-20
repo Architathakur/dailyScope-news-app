@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DailyScope</title>
+<style>
+body, html { margin:0; padding:0; font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:#F0F0F0; }
+.split { display:flex; height:100vh; overflow:hidden; }
+.left { flex:1; background:#872341; color:#fff; display:flex; flex-direction:column; align-items:center; padding:40px 20px; box-sizing:border-box; text-align:center; }
+.left h1 { font-size:3rem; margin-bottom:20px; }
+.welcome-text {
+  font-size:1.1rem;
+  max-width:400px;
+  margin-bottom:25px;
+  line-height:1.6;
+  color:#FFDDEE;
+  text-align:center;
+}
+.welcome-text strong { color:#fff; }
+.inputs { display:flex; flex-direction:column; width:100%; max-width:300px; gap:10px; }
+.inputs input, .inputs button { padding:8px 10px; border-radius:5px; border:none; font-size:1rem; width:100%; }
+.inputs button { background:#5C1A2C; color:#fff; cursor:pointer; }
+.inputs button:hover { background:#3D0F1B; }
+.right { flex:2; background:#fff; padding:20px; overflow-y:auto; scroll-behavior:smooth; }
+.news-section h2 { border-bottom:2px solid; padding-bottom:5px; margin-top:5px; }
+.news-section { margin-bottom:30px; } /* Space between categories */
+.grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(250px,1fr)); gap:10px 15px; margin-top:5px; }
+.card { background:#FDE7F0; border-left:5px solid #872341; border-radius:10px; overflow:hidden; display:flex; flex-direction:column; transition: transform 0.3s, box-shadow 0.3s; }
+.card:hover { transform:translateY(-5px); box-shadow:0 8px 20px rgba(0,0,0,0.2); }
+.card img { width:100%; height:150px; object-fit:cover; }
+.card-content { padding:10px 15px; }
+.card-content h3 { margin:5px 0; font-size:1rem; color:#5C1A2C; }
+.card-content p { font-size:0.9rem; color:#333; }
+.card-content a { text-decoration:none; color:#872341; font-weight:bold; }
+.show-more { margin-top:15px; padding:6px 12px; border:none; border-radius:20px; cursor:pointer; }
+.weather-box { margin-top:20px; background:#FDE7F0; border-left:5px solid #872341; border-radius:10px; padding:15px; }
+.contact-box{ margin-top:20px; background:#FDE7F0; border-left:5px solid #872341; border-radius:10px; padding:15px; text-align:center; }
+.contact-box h3{ margin:0 0 10px 0; color:#872341; }
+.trending-box marquee { font-weight:bold; font-size:0.9rem; color:#5C1A2C; }
+#fact-box { margin-top:auto; background:#FDE7F0; border-left:5px solid #fff; border-radius:10px; padding:15px; color:#000; width:100%; box-sizing:border-box; }
+.right::-webkit-scrollbar { width:8px; }
+.right::-webkit-scrollbar-thumb { background-color:#872341; border-radius:4px; }
+.spinner { border:4px solid #f3f3f3; border-top:4px solid #872341; border-radius:50%; width:30px; height:30px; animation:spin 1s linear infinite; margin:20px auto; }
+@keyframes spin { 0%{ transform:rotate(0deg); } 100%{ transform:rotate(360deg); } }
+@media(max-width:768px){ .split{flex-direction:column;} .left h1{font-size:2rem;} .welcome-text{font-size:1rem; max-width:300px;} .inputs{max-width:100%;} }
+</style>
+</head>
+<body>
+
+<div class="split">
+  <div class="left">
+    <h1>DailyScope</h1>
+    <p class="welcome-text">
+      Welcome to <strong>DailyScope</strong> — your very own news platform! 🌎  
+      We bring you the latest headlines from around the world, top trending stories, and live weather updates, all in one place.  
+      Stay informed, stay curious, and make every day smarter with DailyScope!
+    </p>
+
+    <div class="inputs">
+      <input type="text" id="search" placeholder="Search news...">
+      <input type="text" id="city" placeholder="Enter city for weather">
+      <button onclick="updateAll()">Get Updates</button>
+    </div>
+
+    <!-- Did You Know Box at the BOTTOM -->
+    <div id="fact-box">
+      <h3>Did You Know?</h3>
+      <p id="fact-content">Loading fact...</p>
+    </div>
+  </div>
+
+  <div class="right">
+    <!-- Trending Headlines Ticker -->
+    <div id="trending" class="trending-box">
+      <marquee id="trending-text" scrollamount="3"></marquee>
+    </div>
+
+    <!-- News Container -->
+    <div id="news-container"></div>
+
+    <!-- Weather Box -->
+    <div id="weather" class="weather-box">
+      <h2>Weather Report</h2>
+      <div id="weather-content"></div>
+    </div>
+
+    <!-- Contact Box -->
+    <div class="contact-box">
+      <h3>Contact Me</h3>
+      <p>Archita Thakur</p>
+      <p>architath27@gmail.com</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const NEWS_API_KEY = "efe77f442cf90f951d7736d9917e1cc5"; // Replace with your free GNews key
+// efe77f442cf90f951d7736d9917e1cc5 
+const categories = ["general","world","nation","business","technology"];
+const categoryColors = { general:"#872341", world:"#1F618D", nation:"#A569BD", business:"#1E8449", technology:"#2E86C1" };
+let storedArticles = {};
+
+function createSpinner(){ return `<div class="spinner"></div>`; }
+
+async function fetchCategoryNews(category){
+  try{
+    const res = await fetch(`https://gnews.io/api/v4/top-headlines?token=${NEWS_API_KEY}&lang=en&topic=${category}&max=10`);
+    const data = await res.json();
+    return (data.articles||[]).filter(a=>a.image);
+  }catch(err){ console.error(err); return []; }
+}
+
+async function fetchWeather(city){
+  if(!city) return null;
+  try{
+    const res = await fetch(`https://wttr.in/${city}?format=j1`);
+    const data = await res.json();
+    const current = data.current_condition[0];
+    return {
+      temp_c: current.temp_C,
+      condition: { text: current.weatherDesc[0].value },
+      humidity: current.humidity,
+      wind_kph: current.windspeedKmph,
+      forecast: data.weather
+    };
+  }catch(err){ console.error(err); return null; }
+}
+
+function renderCategorySection(category, articles){
+  const container = document.getElementById("news-container");
+  const section = document.createElement("div");
+  section.className = `news-section ${category}`;
+
+  let gridContent = '';
+  if(articles.length === 0){
+    gridContent = `<p style="color:#555; font-style:italic;">No articles available in this category.</p>`;
+  }
+
+  section.innerHTML = `<h2 style="border-color:${categoryColors[category]}">${category.charAt(0).toUpperCase()+category.slice(1)}</h2>
+    <div class="grid content">${gridContent}</div>
+    ${articles.length>3 ? `<button class="show-more" style="background:${categoryColors[category]}; color:#fff;" onclick="toggleMore('${category}')">Show More</button>` : ''}`;
+  
+  container.appendChild(section);
+  storedArticles[category] = articles;
+
+  if(articles.length > 0){
+    const grid = section.querySelector(".content");
+    articles.slice(0,3).forEach(a=> grid.innerHTML += cardHTML(a));
+    grid.dataset.expanded = "false";
+  }
+}
+
+function cardHTML(a){
+  return `<div class="card">
+    <img loading="lazy" src="${a.image}" alt="news image">
+    <div class="card-content">
+      <h3>${a.title}</h3>
+      <p>${a.description || ''}</p>
+      <a href="${a.url}" target="_blank">Read more</a>
+    </div>
+  </div>`;
+}
+
+function toggleMore(category){
+  const grid = document.querySelector(`#news-container .news-section.${category} .content`);
+  const articles = storedArticles[category] || [];
+  if(grid.dataset.expanded==="true"){
+    grid.innerHTML = '';
+    articles.slice(0,3).forEach(a=> grid.innerHTML += cardHTML(a));
+    grid.dataset.expanded="false";
+  }else{
+    grid.innerHTML = '';
+    articles.forEach(a=> grid.innerHTML += cardHTML(a));
+    grid.dataset.expanded="true";
+  }
+}
+
+function filterNews(keyword){
+  document.getElementById("news-container").innerHTML = '';
+  categories.forEach(cat => {
+    const filtered = (storedArticles[cat] || []).filter(a => 
+      a.title.toLowerCase().includes(keyword.toLowerCase()) || 
+      (a.description && a.description.toLowerCase().includes(keyword.toLowerCase()))
+    );
+    renderCategorySection(cat, filtered);
+  });
+}
+
+function updateTrending(){
+  let trendingArticles = [];
+  categories.forEach(cat => {
+    if(storedArticles[cat]){
+      trendingArticles.push(...storedArticles[cat].slice(0,2));
+    }
+  });
+  const trendingText = trendingArticles.map(a => `📰 ${a.title}`).join("  |  ");
+  document.getElementById("trending-text").textContent = trendingText || "No trending headlines available";
+}
+
+const facts = [
+  "The first computer bug was an actual moth.",
+  "Honey never spoils and can last thousands of years.",
+  "Octopuses have three hearts.",
+  "The longest recorded flight of a chicken is 13 seconds.",
+  "Bananas are berries, but strawberries are not.",
+  "A group of flamingos is called a 'flamboyance'.",
+  "Sharks existed before trees."
+];
+function updateFact(){
+  const fact = facts[Math.floor(Math.random()*facts.length)];
+  document.getElementById("fact-content").textContent = fact;
+}
+setInterval(updateFact, 15000);
+updateFact();
+
+function renderWeather(weather){
+  const container = document.getElementById("weather-content");
+  if(!weather){ container.innerHTML="<p>No weather data available.</p>"; return; }
+
+  let forecastHtml = '';
+  weather.forecast.slice(0,2).forEach(day=>{
+    forecastHtml += `
+      <p><strong>${day.date}</strong> - Min: ${day.mintempC}°C, Max: ${day.maxtempC}°C, Condition: ${day.hourly[0].weatherDesc[0].value}</p>
+    `;
+  });
+
+  container.innerHTML = `
+    <p><strong>Temperature:</strong> ${weather.temp_c}°C</p>
+    <p><strong>Condition:</strong> ${weather.condition.text}</p>
+    <p><strong>Humidity:</strong> ${weather.humidity}%</p>
+    <p><strong>Wind:</strong> ${weather.wind_kph} kph</p>
+    <h4>Next 2 days forecast:</h4>
+    ${forecastHtml}
+  `;
+}
+
+function updateRightPanelExtras(){ updateTrending(); }
+
+async function updateAll(){
+  const city = document.getElementById("city").value;
+
+  document.getElementById("news-container").innerHTML = createSpinner();
+  document.getElementById("weather-content").innerHTML = createSpinner();
+
+  const newsPromises = categories.map(cat => fetchCategoryNews(cat));
+  const weatherPromise = fetchWeather(city);
+
+  const newsResults = await Promise.all(newsPromises);
+  const weather = await weatherPromise;
+
+  storedArticles = {};
+  newsResults.forEach((articles,i)=> storedArticles[categories[i]] = articles);
+
+  // 🔥 clear spinner before rendering news
+  document.getElementById("news-container").innerHTML = "";
+
+  const keyword = document.getElementById("search").value.trim();
+  if(keyword) filterNews(keyword);
+  else categories.forEach(cat => renderCategorySection(cat, storedArticles[cat]));
+
+  renderWeather(weather);
+  updateRightPanelExtras();
+}
+
+document.getElementById("search").addEventListener("input", ()=> {
+  const keyword = document.getElementById("search").value.trim();
+  filterNews(keyword);
+  updateTrending();
+});
+
+updateAll();
+</script>
+
+</body>
+</html>

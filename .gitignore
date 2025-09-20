@@ -1,0 +1,8 @@
+# System files
+.DS_Store
+
+# Node modules (in case you use Node in future)
+node_modules/
+
+# Environment files
+.env
