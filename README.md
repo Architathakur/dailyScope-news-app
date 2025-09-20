@@ -23,3 +23,8 @@ It features categories, trending headlines, and fun “Did You Know” facts.
 
 ## Live Preveiw
 https://architathakur.github.io/dailyScope-news-app/
+
+## Author
+
+Archita Thakur
+architath27@gmail.com
